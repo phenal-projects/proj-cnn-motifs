@@ -1,11 +1,7 @@
-"""Prepare data for CNN. Original data must be available in ./cnn directory"""
-import os
-
-os.chdir("./cnn")
+"""Prepare data for CNN. Original data must be available in the same directory"""
 import MakeNcRNAMatrix as mm
 from AssembleMatrix import assembledata
 from Bio import SeqIO
-from subprocess import Popen, PIPE
 
 # adjust parameters below to fit your data
 infile = "testdata/6families_sequence.fa"
