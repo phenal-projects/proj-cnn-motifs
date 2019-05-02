@@ -1,7 +1,7 @@
-import multiprocessing as mp
 import re
 import subprocess
 import sys
+from multiprocessing.dummy import Pool as ThreadPool
 
 import numpy as np
 from Bio import SeqIO
@@ -97,7 +97,7 @@ def make_one_pair(triple):
 
     # get base pair matrix
     path_to_bpfile = "bp" + dataset[i][0] + "_" + dataset[j][0] + ".txt"
-    bp_mat = get_basepair_matrix(path_to_bpfile)
+    bp_mat = get_basepair_matrix(path_to_bpfile)  # bottle neck
     subprocess.call(["rm", path_to_bpfile])
 
     # make train data
@@ -156,7 +156,7 @@ def make_pairFASTA(dataset, itr1, outpath, threads=3):
     train_data = np.empty((0, 1200, 16), dtype=np.float32)
     train_label = np.empty((0), dtype=np.int32)
     args_list = ((dataset, itr1, j) for j in range(itr1 + 1, len(dataset)))
-    with mp.Pool(processes=threads) as p:
+    with ThreadPool(processes=threads) as p:  # ibm: running dafs in parallel.
         data_n_labels = p.map(make_one_pair, args_list)
 
     for data, label in data_n_labels:
