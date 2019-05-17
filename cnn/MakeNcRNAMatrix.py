@@ -6,6 +6,8 @@ from multiprocessing.dummy import Pool as ThreadPool
 import numpy as np
 from Bio import SeqIO
 
+# max alignment length
+max_len = 3200
 
 def run_DAFS(path):
     inn = subprocess.Popen(['dafs', path], stdout=subprocess.PIPE)
@@ -16,7 +18,6 @@ def run_DAFS(path):
 
         if not innline:
             break
-
     return buf[4].strip().upper(), buf[6].strip().upper()
 
 
@@ -101,7 +102,7 @@ def make_one_pair(triple):
     subprocess.call(["rm", path_to_bpfile])
 
     # make train data
-    data = np.zeros(([1200, 16]), dtype=np.float32)
+    data = np.zeros(([max_len, 16]), dtype=np.float32)
     n1 = 0
     n2 = 0
     for k in range(len(pair1)):
@@ -153,7 +154,7 @@ def make_one_pair(triple):
 
 
 def make_pairFASTA(dataset, itr1, outpath, threads=3):
-    train_data = np.empty((0, 1200, 16), dtype=np.float32)
+    train_data = np.empty((0, max_len, 16), dtype=np.float32)
     train_label = np.empty((0), dtype=np.int32)
     args_list = ((dataset, itr1, j) for j in range(itr1 + 1, len(dataset)))
     with ThreadPool(processes=threads) as p:  # ibm: running dafs in parallel.
