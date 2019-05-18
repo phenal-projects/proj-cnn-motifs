@@ -7,7 +7,7 @@ import numpy as np
 from Bio import SeqIO
 
 # max alignment length
-max_len = 3200
+max_len = 1200
 
 def run_DAFS(path):
     inn = subprocess.Popen(['dafs', path], stdout=subprocess.PIPE)
@@ -68,7 +68,7 @@ def get_basepair_matrix(path_to_bpfile):
             # probability of (
             for k in range(j, seqlen[i]):
                 Left += Array[i][j][k]
-            # probability of )
+            # probability of )/home/ilbumi/PycharmProjects/proj-cnn-motifs/cnn/data/sample.fasta
             for k in range(j):
                 Right += Array[i][k][j]
             bp[j][0] = Left

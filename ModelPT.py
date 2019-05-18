@@ -67,7 +67,7 @@ class ConvNet(nn.Module):
         """
         optimizer = torch.optim.Adam(self.parameters(), lr=lr)
         scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
-            optimizer, len(train_dl), 1, 0.001
+            optimizer, len(train_dl), 1, 0.0005
         )
         # training cycle and tracking some stats
         start = time.time()
@@ -106,19 +106,19 @@ class ConvNet(nn.Module):
                 total = val_set[1].size(0)
                 _, predicted = torch.max(outputs.data, 1)
                 correct = (predicted == val_set[1]).sum().item()
-                self.stats["val_sens"].append(torch.min(predicted, val_set[1]).sum().item() / predicted.sum().item())
+                self.stats["val_prec"].append(torch.min(predicted, val_set[1]).sum().item() / predicted.sum().item())
                 self.stats["val_acc"].append(correct / total)
             if not silent:
                 print(
-                    "Epoch [{}/{}], Loss (train/val): {:.4f}/{:.4f}, Accuracy (train/val): {:.2f}%/{:.2f}%, "
-                    "Sensitivity (val): {:.2f}, Current lr: {:.5f}. Time elapsed: {:.2f}".format(
+                    "Epoch [{}/{}], Loss (train/val): {:.4f}/{:.4f}, Accuracy (train/val): {:.4f}%/{:.4f}%, "
+                    "Precision (val): {:.4f}, Current lr: {:.5f}. Time elapsed: {:.2f}".format(
                         epoch + 1,
                         num_epochs,
                         self.stats["epoch_loss"][-1],
                         self.stats["val_loss"][-1],
                         self.stats["epoch_acc"][-1] * 100,
                         self.stats["val_acc"][-1] * 100,
-                        self.stats["val_sens"][-1],
+                        self.stats["val_prec"][-1],
                         scheduler.get_lr()[0],
                         time.time() - start
                     )

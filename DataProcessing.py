@@ -37,19 +37,19 @@ class TupleDataset(Dataset):
         return "TupleDataset. Length:{}".format(len(self))
 
 
-class AlignmentFilePrepare:
+class AlignmentFilePrepare(Dataset):
     """
     Class for storing and handling labeled pairwise alignments of two classes (loading from files)
     """
 
-    def __init__(self, data_path, aln_labels_path, genelabels_path):
+    def __init__(self, data_path, aln_labels_path, genelabels_path, max_len=1200):
         """
         Initializes dataset class. All the files should be ordered
         :param data_path: path to data npy file
         :param aln_labels_path: path to alignments labels npy file
         :param genelabels_path: path to gene labels txt file
         """
-        self.alns = np.load(data_path)
+        self.alns = np.load(data_path)[:, :max_len, :]
         self.labels = np.load(aln_labels_path)
         if len(self.alns) != len(self.labels):
             raise IndexError("Lengths of alns and labels do not match")
@@ -59,11 +59,11 @@ class AlignmentFilePrepare:
         if len(self.alns) != (len(self.gene_names) ** 2 - len(self.gene_names)) // 2:
             raise IndexError("Lengths of alns and genes do not match")
         self.index_to_coords = list(combinations(range(len(self.gene_names)), 2))
-        #
 
     def __len__(self):
         return len(self.alns)
 
+    # noinspection PyArgumentList
     def __getitem__(self, item):
         """
         :param item: index of requested item
@@ -72,7 +72,8 @@ class AlignmentFilePrepare:
         c1, c2 = self.index_to_coords[item]
         return (
             Tensor(self.alns[item]).reshape(1, *self.alns[item].shape),
-            self.labels[item],
+            # fix difference in original notation (1 is not the same) and intuitive notation
+            int(self.class_labels[c1] != self.class_labels[c2]),
             self.gene_names[c1],
             self.gene_names[c2],
             self.class_labels[c1],

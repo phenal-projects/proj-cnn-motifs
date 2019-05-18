@@ -1,4 +1,6 @@
 import argparse
+import json
+import pickle
 from collections import Counter
 
 import numpy as np
@@ -35,8 +37,8 @@ def get_args():
     #                    help='Directory to output the result')
     # parser.add_argument('--resume', '-r', default='',
     #                    help='Resume the training from snapshot')
-    # parser.add_argument('--predictor', '-p', default='',
-    #                    help='Learned model file to predict data')
+    parser.add_argument('--predictor', '-p', default='',
+                        help='Learned model file to predict data')
     return parser.parse_args()
 
 
@@ -86,22 +88,70 @@ def load_prepared(datapath, labelpath, glpath, val):
 
 
 args = get_args()
-# Split dataset and load data
-training_dataset, val_dataset = load_prepared(args.dataset, args.label, args.genelabel, args.vpart)
-print(
-    "Data loaded:\n\tTrain: {} alignments\n\tValidation: {} alignments".format(len(training_dataset), len(val_dataset))
-)
-t_positives = np.mean([x[1] for x in training_dataset])
-v_positives = np.mean([x[1] for x in val_dataset])
-print("Negatives in training set: {:.2f}%. In val set: {:.2f}%".format(t_positives * 100, v_positives * 100))
-# !!! may consume too much GPU memory, Needs reimplementing
-val_set = next(iter(DataLoader(TupleDataset(val_dataset), num_workers=4, shuffle=True, batch_size=len(val_dataset))))
-train_dl = DataLoader(TupleDataset(training_dataset), num_workers=3, shuffle=True, batch_size=args.batchsize)
+
 # Try CUDA
 if torch.cuda.is_available() and not args.cpu:
     dev = torch.device("cuda")
 else:
     dev = torch.device("cpu")
-# Define model
-model = ConvNet(64, 128, 15, training_dataset[0][0].shape[2]).to(device=dev)  # parameters from the article
-model.run_training(train_dl, val_set, args.epoch, 0.003, save_every=-1)
+
+# Split dataset and load data
+if not args.predictor:
+    # train neural net
+    training_dataset, val_dataset = load_prepared(args.dataset, args.label, args.genelabel, args.vpart)
+    print(
+        "Data loaded:\n\tTrain: {} alignments\n\tValidation: {} alignments".format(len(training_dataset),
+                                                                                   len(val_dataset))
+    )
+    t_positives = np.mean([x[1] for x in training_dataset])
+    v_positives = np.mean([x[1] for x in val_dataset])
+    print("Negatives in training set: {:.2f}%. In val set: {:.2f}%".format(t_positives * 100, v_positives * 100))
+    # !!! may consume too much GPU memory, Needs reimplementing
+    val_set = next(
+        iter(DataLoader(TupleDataset(val_dataset), num_workers=4, shuffle=True, batch_size=len(val_dataset))))
+    train_dl = DataLoader(TupleDataset(training_dataset), num_workers=3, shuffle=True, batch_size=args.batchsize)
+
+    # Define model
+    model = ConvNet(64, 128, 15, training_dataset[0][0].shape[2]).to(device=dev)  # parameters from the article
+    model.run_training(train_dl, val_set, args.epoch, 0.003, save_every=1)
+
+    # Stats output
+    with open("stats.json", "w") as fout:
+        json.dump(model.stats, fout)
+else:
+    # prediction mode
+    dataset = AlignmentFilePrepare(args.dataset, args.label, args.genelabel)
+    dl = DataLoader(dataset, num_workers=3, shuffle=True, batch_size=args.batchsize)
+    model = ConvNet(64, 128, 15, dataset[0][0].shape[2])
+    model(next(iter(dl))[0])  # for linear layer initialization
+    with open(args.predictor, "rb") as fin:
+        model.load_state_dict(pickle.load(fin))
+    model.to(device=dev)
+    tp = 0
+    fp = 0
+    fn = 0
+    tn = 0
+    with torch.no_grad():
+        for (alns, labels, gn1, gn2, cl1, cl2) in dl:
+            alns = alns.to(dev)
+            labels = labels.to(dev)
+            outputs = model(alns)
+            _, predicted = torch.max(outputs.data, 1)
+            tn += torch.min(predicted, labels).sum().item()
+            fn += ((predicted == 1) == (labels == 0)).sum().item()
+            fp += ((predicted == 0) == (labels == 1)).sum().item()
+            tp += ((predicted == 0) == (labels == 0)).sum().item()
+    with open("prediction_test_results.txt", "w") as fout:
+        fout.write(
+            """
+            predicted\\real\tSAME CLASS\tDIFF CLASSES
+            SAME CLASS\t{}\t{}
+            DIFF CLASSES\t{}\t{}
+            
+            acc: {}
+            prec: {}
+            recall: {}
+            f1-score: {}
+            """.format(tp, fp, fn, tn, (tp + tn) / (tp + tn + fp + fn), tp / (tp + fp), tp / (tp + fn),
+                       2 * tp / (2 * tp + fp + fn))
+        )
