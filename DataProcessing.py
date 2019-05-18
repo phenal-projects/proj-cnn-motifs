@@ -1,7 +1,7 @@
 from itertools import combinations
 
 import numpy as np
-from torch import Tensor
+from torch import Tensor, cat
 from torch.utils.data import Dataset
 
 
@@ -13,19 +13,19 @@ class TupleDataset(Dataset):
     def __init__(self, data_tuples):
         self.data_tuples = data_tuples
         # extend dataset
-        # extension = []
-        # for data in self.data_tuples:
-        #    extension.append(
-        #        (
-        #            torch.cat((data[0][:, :, 8:], data[0][:, :, :8]), dim=2),
-        #            data[1],
-        #            data[3],
-        #            data[2],
-        #            data[5],
-        #            data[4]
-        #        )
-        #    )
-        # self.data_tuples += extension
+        extension = []
+        for data in self.data_tuples:
+            extension.append(
+                (
+                    cat((data[0][:, :, 8:], data[0][:, :, :8]), dim=2),
+                    data[1],
+                    data[3],
+                    data[2],
+                    data[5],
+                    data[4]
+                )
+            )
+        self.data_tuples += extension
 
     def __len__(self):
         return len(self.data_tuples)
@@ -37,7 +37,7 @@ class TupleDataset(Dataset):
         return "TupleDataset. Length:{}".format(len(self))
 
 
-class AlignmentFileDataset(Dataset):
+class AlignmentFilePrepare:
     """
     Class for storing and handling labeled pairwise alignments of two classes (loading from files)
     """
@@ -70,9 +70,14 @@ class AlignmentFileDataset(Dataset):
         :return: (aln, label, gene_name1, gene_name2, class1, class2)
         """
         c1, c2 = self.index_to_coords[item]
-        return Tensor(self.alns[item]).reshape(1, *self.alns[item].shape), self.labels[item], self.gene_names[c1], \
-               self.gene_names[c2], self.class_labels[c1], \
-               self.class_labels[c2]
+        return (
+            Tensor(self.alns[item]).reshape(1, *self.alns[item].shape),
+            self.labels[item],
+            self.gene_names[c1],
+            self.gene_names[c2],
+            self.class_labels[c1],
+            self.class_labels[c2]
+        )
 
     def __repr__(self):
-        return "AlignmentFileDataset. Length:{}. Alignment shape:{}x{}".format(len(self), *self.alns[0].shape)
+        return "AlignmentFilePrepare. Length:{}. Alignment shape:{}x{}".format(len(self), *self.alns[0].shape)

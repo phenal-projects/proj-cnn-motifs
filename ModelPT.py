@@ -30,9 +30,9 @@ class ConvNet(nn.Module):
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=(14, 1), stride=8),
         )
+        self.fc1 = nn.Sequential(nn.Linear(2048, 1638), nn.ReLU())
         self.drop_out = nn.Dropout()
-        self.fc1 = nn.Sequential(nn.Linear(2048, 1632), nn.ReLU())
-        self.fc2 = nn.Linear(1632, 2)
+        self.fc2 = nn.Linear(1638, 2)
         # criterion
         self.criterion = nn.CrossEntropyLoss()
         # load state dict, if passed
@@ -46,11 +46,11 @@ class ConvNet(nn.Module):
         out = self.layer1(x)
         out = self.layer2(out)
         out = out.reshape(out.size(0), -1)
-        out = self.drop_out(out)
         if out.shape[1] != self.fc1[0].in_features:
             print("!!!Automatic linear layer reshaping!!!")
-            self.fc1 = nn.Sequential(torch.nn.Linear(out.shape[1], 1632), nn.ReLU()).to(out.device)
+            self.fc1 = nn.Sequential(torch.nn.Linear(out.shape[1], 1638), nn.ReLU()).to(out.device)
         out = self.fc1(out)
+        out = self.drop_out(out)
         out = self.fc2(out)
         return out
 
@@ -61,15 +61,14 @@ class ConvNet(nn.Module):
         :param val_set: Set with validation data : (Tensor(B, 1, H, W), Tensor(B,))
         :param num_epochs: number of epochs to learn: int
         :param lr: maximum learning rate (function uses Cosine Annealing with Warm Restarts): float
-        :param momentum: momentum of SGD optimizer: float
         :param save_every: how often to save model (after every %save_every% epoch): int
         :param silent: to print or not print? Epoch information: bool
         :return: None
         """
-        optimizer = torch.optim.Adamax(self.parameters(), lr=lr)
-        # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
-        #    optimizer, 200, 1, 0.0001
-        # )
+        optimizer = torch.optim.Adam(self.parameters(), lr=lr)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
+            optimizer, len(train_dl), 1, 0.001
+        )
         # training cycle and tracking some stats
         start = time.time()
         val_set[0] = val_set[0].to(self.device)
@@ -94,8 +93,8 @@ class ConvNet(nn.Module):
                 _, predicted = torch.max(outputs.data, 1)
                 correct = (predicted == labels).sum().item()
                 self.stats["batch_acc"].append(correct / total)
-                # self.stats["batch_lr"].append(scheduler.get_lr()[0])
-                # scheduler.step()
+                self.stats["batch_lr"].append(scheduler.get_lr()[0])
+                scheduler.step()
             self.stats["epoch_loss"].append(np.average(self.stats["batch_loss"][-len(train_dl):]))  # epoch average loss
             self.stats["epoch_acc"].append(
                 np.average(self.stats["batch_acc"][-len(train_dl):]))  # epoch average accuracy
@@ -120,8 +119,7 @@ class ConvNet(nn.Module):
                         self.stats["epoch_acc"][-1] * 100,
                         self.stats["val_acc"][-1] * 100,
                         self.stats["val_sens"][-1],
-                        0,
-                        # scheduler.get_lr()[0],
+                        scheduler.get_lr()[0],
                         time.time() - start
                     )
                 )
