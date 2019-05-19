@@ -17,18 +17,18 @@ def get_args():
 
 
 def matrix_to_seqs(m):
-    s1, s2 = [], []
+    seq1, seq2 = [], []
     nucl = np.array(list("ATGC"))
     for col in m:
         n1 = nucl[col[:4] == 1]
         n2 = nucl[col[8:12] == 1]
         if len(n1) > 0:
-            s1.append(n1[0])
+            seq1.append(n1[0])
         if len(n2) > 0:
-            s2.append(n2[0])
-    s1 = "".join(s1)
-    s2 = "".join(s2)
-    return s1, s2
+            seq2.append(n2[0])
+    seq1 = "".join(seq1)
+    seq2 = "".join(seq2)
+    return seq1, seq2
 
 
 args = get_args()

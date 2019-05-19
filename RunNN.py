@@ -17,7 +17,7 @@ torch.manual_seed(77)
 
 
 def get_args():
-    """Function to parse args"""
+    """Function for parsing args"""
     parser = argparse.ArgumentParser(description='CNN ncRNA classification:')
     parser.add_argument('--dataset', '-d', default="./testdata/ncRNApairdataDAFS_test.npy",
                         help='The dataset to use: numpy file (hoge.npy) of aligned 2 ncRNAs pair data.')
@@ -33,10 +33,8 @@ def get_args():
                         help='Size of validation')
     parser.add_argument('--cpu', '-c', action='store_true',
                         help='Forbids GPU using')
-    # parser.add_argument('--out', '-o', default='result',
-    #                    help='Directory to output the result')
-    # parser.add_argument('--resume', '-r', default='',
-    #                    help='Resume the training from snapshot')
+    parser.add_argument('--structure', '-s', action='store_true',
+                        help='Use structure info only')
     parser.add_argument('--predictor', '-p', default='',
                         help='Learned model file to predict data')
     return parser.parse_args()
@@ -65,17 +63,18 @@ def split_test(a, b):
     return chisquare(f1, f2)[1]
 
 
-def load_prepared(datapath, labelpath, glpath, val):
+def load_prepared(datapath, labelpath, glpath, val, structure=False):
     """
     Loads and splits dataset from prepared npy files
     :param datapath: path to data file
     :param labelpath: path to labels file
     :param glpath: path to gene labels file
     :param val: validation part
+    :param structure: use only structure data
     :return: (train, val) dataset
     """
     total_dataset = AlignmentFilePrepare(datapath, labelpath,
-                                         glpath)  # :( I have no time to reduce disk usage
+                                         glpath, structure)  # :( I have no time to reduce disk usage
     num_classes = total_dataset[-1][5] + 1
     y = [e[4] * num_classes + e[5] for e in
          total_dataset]  # unique class identifiers for every alignment for balanced split
@@ -98,7 +97,13 @@ else:
 # Split dataset and load data
 if not args.predictor:
     # train neural net
-    training_dataset, val_dataset = load_prepared(args.dataset, args.label, args.genelabel, args.vpart)
+    training_dataset, val_dataset = load_prepared(
+        args.dataset,
+        args.label,
+        args.genelabel,
+        args.vpart,
+        structure=args.structure
+    )
     print(
         "Data loaded:\n\tTrain: {} alignments\n\tValidation: {} alignments".format(len(training_dataset),
                                                                                    len(val_dataset))
@@ -110,7 +115,7 @@ if not args.predictor:
     val_set = next(
         iter(DataLoader(TupleDataset(val_dataset), num_workers=4, shuffle=True, batch_size=len(val_dataset))))
     train_dl = DataLoader(TupleDataset(training_dataset), num_workers=3, shuffle=True, batch_size=args.batchsize)
-
+    print("Data is loaded. Shape: {}".format(training_dataset[0][0].shape))
     # Define model
     model = ConvNet(64, 128, 15, training_dataset[0][0].shape[2]).to(device=dev)  # parameters from the article
     model.run_training(train_dl, val_set, args.epoch, 0.003, save_every=1)

@@ -42,7 +42,7 @@ class AlignmentFilePrepare(Dataset):
     Class for storing and handling labeled pairwise alignments of two classes (loading from files)
     """
 
-    def __init__(self, data_path, aln_labels_path, genelabels_path, max_len=1200):
+    def __init__(self, data_path, aln_labels_path, genelabels_path, structure=False, max_len=1200):
         """
         Initializes dataset class. All the files should be ordered
         :param data_path: path to data npy file
@@ -50,6 +50,9 @@ class AlignmentFilePrepare(Dataset):
         :param genelabels_path: path to gene labels txt file
         """
         self.alns = np.load(data_path)[:, :max_len, :]
+        if structure:
+            # if exception was raised, check if you passed DAFS matrices Width=16
+            self.alns = self.alns[:, :, [6, 7, 8, 13, 14, 15]]
         self.labels = np.load(aln_labels_path)
         if len(self.alns) != len(self.labels):
             raise IndexError("Lengths of alns and labels do not match")
